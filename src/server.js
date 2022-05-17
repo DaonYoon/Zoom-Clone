@@ -1,31 +1,68 @@
-import express from "express";
-import { WebSocketServer } from 'ws';
 import http from "http";
+import SocketIO from "socket.io";
+import express from "express";
+import { isObject } from "util";
+import { setTimeout } from "timers";
 
-const app = express();                     //app을 express 서버로 쓰겠다
+const app = express();
 
-app.set("view engine", "pug");            // app의 템플레이트를 pug로 쓴다
-app.set("views", __dirname + "/views");   // views의 위치는 현재폴더 + /views에 있다
-app.use("/public", express.static(__dirname + "/public"));    // /public 이상의 주소가 입력되면 현재폴더 + /public폴더로 들어간다
-
-app.get("/", (req,res) => res.render("home"));
-app.get("/*", (req,res) => res.render("home"));
+app.set("view engine", "pug");
+app.set("views", __dirname + "/views");
+app.use("/public", express.static(__dirname + "/public"));
+app.get("/", (_, res) => res.render("home"));
+app.get("/*", (_, res) => res.redirect("/"));
 
 const handleListen = () => console.log(`Listening on http://localhost:3000`);
 
-//app.listen(3000, handleListen);
+const httpServer = http.createServer(app);
+const wsServer = SocketIO(httpServer);
+
+wsServer.on("connection", (socket) => {
+  socket.onAny((event) => {
+    console.log(`Socket Events : ${event}`);
+  })
+
+  
+  socket.on("enter_room", (roomName, ShowRoom) => {
+  socket.join(roomName);
+  ShowRoom();
+  socket.to(roomName).emit("welcome");
+});
+  socket.on("disconnecting", () => { 
+    socket.rooms.forEach((room) => socket.to(room).emit("bye"));
+});
+  socket.on("new_message", (msg, room, done) => {
+    socket.to(room).emit("new_message", msg);
+    done();
+  })
+});
 
 
-const server = http.createServer(app);             //server는 app의 http서버다
-const wss = new WebSocketServer({ server });        // wss는 새로운 웹소켓서버다 
 
 
-wss.on("connection", (socket) => {             // 프론트엔드와 연결됬을때 사용
-    console.log("Connected to browser")        
-    socket.on("close", () => console.log("SERVER DOWN"));    // 서버가 닫혔을때
-    socket.on("message", (message) => {                     // message가 감지되면 출력겠다.
-        console.log(message);
-    })
-    socket.send("Hello!")                            // 프론트로 hello 인사때리겠다.
-})
-server.listen(3000, handleListen)
+
+
+
+
+// const sockets = [];
+// wss.on("connection", (socket) => {
+//   sockets.push(socket);
+//   socket["nickname"] = "Anon"
+//   console.log("Connected to Browser ✅");
+//   socket.on("close", onSocketClose);
+//   socket.on("message", (msg) => {
+//     const message = JSON.parse(msg)
+//     switch (message.type) {
+//       case "new_message":
+//         sockets.forEach((aSocket) =>
+//         aSocket.send (`${socket.nickname}: ${mess.payload}`));
+//       case "nickname" :
+//       socket["nickname"] = message.payload
+//     }
+//   });
+// });
+function onSocketClose() {
+  console.log("Disconnected from the Browser ❌");
+}
+
+httpServer.listen(3000, handleListen);

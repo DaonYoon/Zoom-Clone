@@ -1,14 +1,56 @@
-const socket = new WebSocket(`ws://${window.location.host}`)   // socket은 `ws://localost:3000가 연결
 
-socket.addEventListener("open", () =>{         // 백엔드와 연결이됬을떄
-    console.log("Connected to Server ");
+const welcome = document.querySelector("#welcome")
+const form = welcome.querySelector("form")
+const room = document.querySelector("#room");
+
+room.hidden = true;  //room은 디스플레이 숨기겠다
+let roomName;        
+
+
+function addMessage(message) {
+  const ul = room.querySelector("ul")
+  const li = document.createElement("li")
+  li.innerText = message;
+  ul.appendChild(li);
+}
+
+function handleMessageSubmit(event) {
+  event.preventDefault();
+  const input = room.querySelector("input");
+  socket.emit("new_message", input.value, roomName, () => {
+    addMessage(`You : ${input.value}`);
+  })
+}
+
+function ShowRoom() {
+  welcome.hidden = true;
+  room.hidden = false;
+  const h3 = room.querySelector("h3");
+  h3.innerText = roomName;
+  const form = room.querySelector("form")
+  form.addEventListener("submit", handleMessageSubmit);
+  
+}
+
+const socket = io();
+
+
+function handleRoomSubmit(event) {
+  event.preventDefault();
+  const input = form.querySelector("input");
+  console.log(input.value)
+  socket.emit("enter_room", input.value, ShowRoom);
+  roomName = input.value;
+  input.value="";
+}
+
+socket.on("welcome", () => {
+    addMessage("Somebody Join!")
 })
 
-socket.addEventListener("message", (message) => {       // message가 감지됬을때 출력하겠다
-    console.log("Just got this: ", message.data , "from the server");
+socket.on("bye", () => {
+  addMessage("Somebody Exit!");
 })
 
-
-setTimeout(() => {       // 1초뒤 서버로 메세지 보내겠다
-    socket.send("Hello from the browser");
-}, 1000)
+socket.on("new_message", addMessage)
+form.addEventListener("submit", handleRoomSubmit)
